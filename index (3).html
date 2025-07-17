@@ -1,0 +1,117 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WatchWithVandana Lite</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 30px;
+      font-family: Arial, sans-serif;
+    }
+    input, button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #player {
+      width: 90%;
+      max-width: 720px;
+      height: 400px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🎬 Watch With Vandana – Lite</h2>
+
+  <input id="room" placeholder="Enter Room Code">
+  <button onclick="joinRoom()">Join Room</button><br>
+
+  <input id="ytlink" placeholder="Paste YouTube Link">
+  <button onclick="setVideo()">Set Video</button>
+
+  <div id="player"></div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyXXXXXXX",
+    authDomain: "your-app.firebaseapp.com",
+    databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+    projectId: "your-app",
+    storageBucket: "your-app.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let player, roomRef;
+
+  window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('player', {
+      height: '390',
+      width: '640',
+      videoId: '',
+      events: {
+        onStateChange: onPlayerStateChange,
+      }
+    });
+  };
+
+  function joinRoom() {
+    const room = document.getElementById('room').value.trim();
+    if (!room) return alert('Enter a valid room code');
+    roomRef = db.ref('rooms/' + room);
+
+    roomRef.child('video').on('value', snap => {
+      const v = snap.val();
+      if (v) {
+        player.loadVideoById(v.id, v.time || 0);
+      }
+    });
+
+    roomRef.child('control').on('value', snap => {
+      const c = snap.val();
+      if (c) {
+        player.seekTo(c.time || 0, true);
+        if (c.action === 'play') player.playVideo();
+        else if (c.action === 'pause') player.pauseVideo();
+      }
+    });
+
+    alert('Joined Room: ' + room);
+  }
+
+  function setVideo() {
+    const url = document.getElementById('ytlink').value;
+    const match = url.match(/(?:v=|\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (!match) return alert('Invalid YouTube Link!');
+    const videoId = match[1];
+
+    roomRef.child('video').set({ id: videoId, time: 0 });
+    roomRef.child('control').set({ action: 'play', time: 0 });
+  }
+
+  function onPlayerStateChange(event) {
+    if (!roomRef) return;
+    const action = event.data === YT.PlayerState.PLAYING ? 'play' :
+                   event.data === YT.PlayerState.PAUSED ? 'pause' : null;
+
+    if (action) {
+      roomRef.child('control').set({
+        action: action,
+        time: player.getCurrentTime()
+      });
+    }
+  }
+</script>
+</body>
+</html>
